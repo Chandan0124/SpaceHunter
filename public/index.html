@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpaceHunter - Local Deep Disk Space & Bloat Hunter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div class="app-layout">
+    
+    <!-- Top Bar -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">SpaceHunter</h1>
+          <span class="brand-sub">100% Local • Zero Telemetry • Safe Cleaner</span>
+        </div>
+      </div>
+
+      <!-- Quick stats summary badge -->
+      <div class="header-actions">
+        <div id="statusIndicator" class="status-badge ready">
+          <span class="status-dot"></span>
+          <span id="statusText">System Ready</span>
+        </div>
+        <button id="refreshDrivesBtn" class="btn btn-secondary btn-sm" title="Refresh Drives">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          Drives
+        </button>
+      </div>
+    </header>
+
+    <!-- Connected Storage Drives Strip -->
+    <section class="drives-strip">
+      <div class="section-label">CONNECTED DRIVES</div>
+      <div id="drivesContainer" class="drives-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Live Scanner Progress Bar (Hidden when idle) -->
+    <div id="scannerBanner" class="scanner-banner hidden">
+      <div class="scanner-header">
+        <div class="scanner-info">
+          <span class="pulse-indicator"></span>
+          <span id="scanTypeLabel" class="scan-type">Scanning...</span>
+          <span id="scanCurrentPath" class="scan-path">C:\...</span>
+        </div>
+        <div class="scanner-stats">
+          <span id="scanFilesCount">0 files</span>
+          <span id="scanFoundBytes" class="highlight-text">0 MB discovered</span>
+        </div>
+      </div>
+      <div class="progress-bar-track">
+        <div id="scanProgressBar" class="progress-bar-fill indeterminate"></div>
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="main-tabs">
+      <button class="tab-btn active" data-tab="bloat">
+        <span class="tab-icon">🧹</span>
+        Quick Bloat Hunter
+      </button>
+      <button class="tab-btn" data-tab="dev">
+        <span class="tab-icon">💻</span>
+        Developer Projects
+      </button>
+      <button class="tab-btn" data-tab="large">
+        <span class="tab-icon">🔍</span>
+        Large File Hunter
+      </button>
+      <button class="tab-btn" data-tab="duplicates">
+        <span class="tab-icon">👯</span>
+        Duplicate Hunter
+      </button>
+      <button class="tab-btn" data-tab="treemap">
+        <span class="tab-icon">🗺️</span>
+        Visual Disk Explorer
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-body">
+      
+      <!-- TAB 1: QUICK BLOAT HUNTER -->
+      <div id="tab-bloat" class="tab-pane active">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button id="startBloatScanBtn" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              Scan Common Bloat
+            </button>
+            <button id="selectAllSafeBtn" class="btn btn-secondary">Select Recommended Safe</button>
+            <button id="deselectAllBtn" class="btn btn-ghost">Deselect All</button>
+          </div>
+          <div class="toolbar-right">
+            <div class="selection-counter">
+              Selected: <strong id="selectedSpaceCount">0 B</strong> (<span id="selectedItemCount">0</span> targets)
+            </div>
+            <button id="dryRunBtn" class="btn btn-warning" disabled>Preview Dry Run</button>
+            <button id="openCleanModalBtn" class="btn btn-danger" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Clean Selected
+            </button>
+          </div>
+        </div>
+
+        <div id="bloatSummaryCard" class="metrics-grid hidden">
+          <div class="metric-card">
+            <div class="metric-label">Total Discovered Bloat</div>
+            <div id="metricTotalBytes" class="metric-val text-cyan">0 B</div>
+            <div id="metricTotalFiles" class="metric-sub">0 files</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Safe to Clean Immediately</div>
+            <div id="metricSafeBytes" class="metric-val text-green">0 B</div>
+            <div class="metric-sub">No personal docs or configs</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Largest Bloat Category</div>
+            <div id="metricTopCategory" class="metric-val text-yellow">-</div>
+            <div id="metricTopCatSize" class="metric-sub">0 B</div>
+          </div>
+        </div>
+
+        <!-- Categorized Accordion / Cards -->
+        <div id="bloatItemsContainer" class="items-list">
+          <div class="empty-state">
+            <div class="empty-icon">🧹</div>
+            <h3>Scan Your System for Hidden Bloat</h3>
+            <p>SpaceHunter searches Windows temp files, crash dumps, shader caches, npm/pip package stores, browser caches, and desktop apps without touching personal files.</p>
+            <button onclick="document.getElementById('startBloatScanBtn').click()" class="btn btn-primary" style="margin-top: 1rem;">
+              Run Quick Scan Now
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: DEVELOPER BLOAT HUNTER -->
+      <div id="tab-dev" class="tab-pane">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="input-group">
+              <label>Scan Location:</label>
+              <select id="devDriveSelect" class="form-select"></select>
+              <input id="devCustomPath" type="text" class="form-input" placeholder="e.g. B:\ or C:\Users\chand\Projects" style="width: 280px;">
+            </div>
+            <button id="startDevScanBtn" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Hunt Dev Bloat
+            </button>
+          </div>
+          <div class="toolbar-right">
+            <div class="selection-counter">
+              Selected Dev Space: <strong id="selectedDevSpace">0 B</strong>
+            </div>
+            <button id="cleanDevBtn" class="btn btn-danger" disabled>Clean Selected Artifacts</button>
+          </div>
+        </div>
+
+        <div class="info-note">
+          <strong>Hunts:</strong> <code>node_modules</code>, <code>.next</code>, <code>target</code> (Rust), <code>bin/obj</code> (.NET), <code>__pycache__</code>, <code>.venv</code>, <code>.gradle</code>.
+          Safe to clean: easily re-generated anytime via <code>npm install</code>, <code>pip install</code>, or <code>cargo build</code>.
+        </div>
+
+        <div id="devResultsContainer" class="items-list">
+          <div class="empty-state">
+            <div class="empty-icon">💻</div>
+            <h3>Find Unused node_modules and Build Artifacts</h3>
+            <p>Pick a drive or workspace folder and SpaceHunter will find old dependencies eating gigabytes of storage.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: LARGE FILE HUNTER -->
+      <div id="tab-large" class="tab-pane">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="input-group">
+              <label>Drive/Folder:</label>
+              <select id="largeDriveSelect" class="form-select"></select>
+              <input id="largeCustomPath" type="text" class="form-input" placeholder="Or custom path" style="width: 220px;">
+            </div>
+            <div class="input-group">
+              <label>Min Size:</label>
+              <select id="largeMinSize" class="form-select">
+                <option value="104857600">100 MB</option>
+                <option value="524288000" selected>500 MB</option>
+                <option value="1073741824">1 GB</option>
+                <option value="5368709120">5 GB</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Filter:</label>
+              <select id="largeCategorySelect" class="form-select">
+                <option value="all">All Types</option>
+                <option value="ai_model">AI Models (.gguf, .pt, .bin)</option>
+                <option value="video">Videos (.mp4, .mkv)</option>
+                <option value="disk_image">Disk/VM Images (.iso, .vhdx)</option>
+                <option value="archive">Archives (.zip, .7z, .tar)</option>
+                <option value="installer">Installers (.exe, .msi)</option>
+                <option value="database">Backups/DBs (.bak, .db)</option>
+              </select>
+            </div>
+            <button id="startLargeScanBtn" class="btn btn-primary">Find Large Files</button>
+          </div>
+        </div>
+
+        <div id="largeResultsContainer" class="items-list">
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <h3>Discover Giant Files Hidden Across Your Drives</h3>
+            <p>Instantly spot multi-gigabyte videos, forgotten ISO disk images, duplicate archives, and AI model weights.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: DUPLICATE FILE HUNTER -->
+      <div id="tab-duplicates" class="tab-pane">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="input-group">
+              <label>Drive / Folder:</label>
+              <select id="dupeDriveSelect" class="form-select"></select>
+              <input id="dupeCustomPath" type="text" class="form-input" placeholder="Or custom directory (e.g. B:\Downloads)" style="width: 250px;">
+            </div>
+            <div class="input-group">
+              <label>Match Mode:</label>
+              <select id="dupeMatchMode" class="form-select">
+                <option value="name" selected>⚡ By Name (Fastest)</option>
+                <option value="name_size">🎯 By Name & Size</option>
+                <option value="exact">🔒 Bit-for-Bit Hash (100% Identical)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Type:</label>
+              <select id="dupeCategorySelect" class="form-select">
+                <option value="all" selected>All Types</option>
+                <option value="image">🖼️ Images / Photos (.jpg, .png, .raw...)</option>
+                <option value="video">🎬 Videos (.mp4, .mkv...)</option>
+                <option value="audio">🎵 Audio (.mp3, .wav...)</option>
+                <option value="document">📄 Documents (.pdf, .docx...)</option>
+                <option value="archive">📦 Archives (.zip, .7z...)</option>
+                <option value="installer">💿 Installers (.exe, .msi...)</option>
+                <option value="code">💻 Code / Scripts</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Min Size:</label>
+              <select id="dupeMinSize" class="form-select">
+                <option value="0">All Sizes</option>
+                <option value="102400" selected>&gt; 100 KB</option>
+                <option value="1048576">&gt; 1 MB</option>
+                <option value="10485760">&gt; 10 MB</option>
+                <option value="104857600">&gt; 100 MB</option>
+              </select>
+            </div>
+            <label class="checkbox-label" title="Skip dev/build folders (.git, node_modules) to avoid library clutter">
+              <input type="checkbox" id="dupeIgnoreDev" checked>
+              <span>Skip Dev Folders (.git, node_modules)</span>
+            </label>
+            <button id="startDupeScanBtn" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Scan Duplicates
+            </button>
+          </div>
+        </div>
+
+        <!-- Metrics bar -->
+        <div id="dupeSummaryCard" class="metrics-grid hidden">
+          <div class="metric-card">
+            <div class="metric-label">Scan Speed & Traversal</div>
+            <div id="metricDupeSpeed" class="metric-val text-cyan">0 files/s</div>
+            <div id="metricDupeScanned" class="metric-sub">0 total files traversed</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Duplicate Sets Discovered</div>
+            <div id="metricDupeSets" class="metric-val text-yellow">0 sets</div>
+            <div id="metricDupeCopies" class="metric-sub">0 duplicate files</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Reclaimable Storage Space</div>
+            <div id="metricDupeWasted" class="metric-val text-green">0 B</div>
+            <div class="metric-sub">Potential space saved by pruning</div>
+          </div>
+        </div>
+
+        <!-- Sub Toolbar with filter and quick selection actions -->
+        <div id="dupeActionToolbar" class="toolbar hidden" style="background-color: var(--bg-card); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;">
+          <div class="toolbar-left">
+            <div class="input-group">
+              <input id="dupeSearchInput" type="text" class="form-input" placeholder="🔍 Filter by file name..." style="width: 220px;">
+            </div>
+            <button id="dupeKeepNewestBtn" class="btn btn-secondary btn-sm" title="Select older copies for deletion and keep newest copy">Keep Newest</button>
+            <button id="dupeKeepOldestBtn" class="btn btn-secondary btn-sm" title="Select newer copies for deletion and keep original oldest copy">Keep Oldest</button>
+            <button id="dupeDeselectAllBtn" class="btn btn-ghost btn-sm">Deselect All</button>
+          </div>
+          <div class="toolbar-right">
+            <div class="selection-counter">
+              Selected: <strong id="selectedDupeCount">0</strong> copies (<strong id="selectedDupeBytes">0 B</strong> reclaimable)
+            </div>
+            <button id="cleanDupesBtn" class="btn btn-danger" disabled>Clean Selected Duplicates</button>
+          </div>
+        </div>
+
+        <!-- Duplicates Container -->
+        <div id="dupeResultsContainer" class="items-list">
+          <div class="empty-state">
+            <div class="empty-icon">👯</div>
+            <h3>Super Fast Drive Duplicate File Analysis</h3>
+            <p>Select any connected drive (C:\, D:\, etc.) or a specific directory. SpaceHunter will rapidly scan hundreds of thousands of files in seconds, grouping duplicate files by name and size so you can safely reclaim gigabytes of storage.</p>
+          </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="dupePagination" class="pagination-bar hidden">
+          <div class="pagination-info">
+            <span id="dupePageInfo">Showing 1–50 of 0 duplicate sets</span>
+          </div>
+          <div class="pagination-actions">
+            <button id="dupePrevPageBtn" class="btn btn-secondary btn-sm" disabled>&larr; Prev Page</button>
+            <span id="dupePageBadge" class="badge badge-muted">Page 1 / 1</span>
+            <button id="dupeNextPageBtn" class="btn btn-secondary btn-sm" disabled>Next Page &rarr;</button>
+            <select id="dupePageSizeSelect" class="form-select btn-sm" style="width: auto; padding: 4px 8px;">
+              <option value="50" selected>50 per page</option>
+              <option value="100">100 per page</option>
+              <option value="200">200 per page</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: VISUAL TREEMAP / DISK EXPLORER -->
+      <div id="tab-treemap" class="tab-pane">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="input-group">
+              <label>Folder:</label>
+              <input id="treemapPathInput" type="text" class="form-input" value="B:\" style="width: 320px;">
+            </div>
+            <button id="startTreemapBtn" class="btn btn-primary">Analyze Folder</button>
+            <div class="quick-jump-chips">
+              <button class="chip" data-path="C:\">C:\</button>
+              <button class="chip" data-path="B:\">B:\</button>
+              <button class="chip" data-path="D:\">D:\</button>
+              <button class="chip" id="chipUserProfile">User Profile</button>
+              <button class="chip" id="chipTemp">Temp</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="treemapBreadcrumb" class="breadcrumb-bar">
+          <span class="breadcrumb-label">Current:</span>
+          <span id="currentTreePath" class="breadcrumb-path">B:\</span>
+          <button id="treeUpBtn" class="btn btn-secondary btn-xs" style="margin-left: 10px;">⬆ Up One Level</button>
+        </div>
+
+        <div id="treemapContainer" class="treemap-view">
+          <div class="empty-state">
+            <div class="empty-icon">🗺️</div>
+            <h3>Visual Folder Space Breakdown</h3>
+            <p>Analyze any folder to see an interactive proportional breakdown of which directories consume the most space.</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- CLEANUP CONFIRMATION MODAL -->
+    <div id="cleanModal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2 class="modal-title">Confirm Space Cleanup</h2>
+          <button id="closeModalBtn" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="cleanup-stat-box">
+            <div class="stat-value" id="modalSpaceToFree">0 B</div>
+            <div class="stat-desc">will be safely reclaimed across <span id="modalItemsCount">0</span> selected targets</div>
+          </div>
+
+          <div class="mode-options">
+            <label class="radio-card selected">
+              <input type="radio" name="cleanModeRadio" value="recycle" checked>
+              <div class="radio-card-body">
+                <div class="radio-card-title">
+                  <span class="badge badge-success">Recommended</span>
+                  Send to Windows Recycle Bin
+                </div>
+                <div class="radio-card-desc">100% recoverable. If you need any file back, you can restore it from your Windows Recycle Bin.</div>
+              </div>
+            </label>
+
+            <label class="radio-card">
+              <input type="radio" name="cleanModeRadio" value="permanent">
+              <div class="radio-card-body">
+                <div class="radio-card-title text-danger">Permanent Deletion</div>
+                <div class="radio-card-desc">Instantly and permanently deletes selected items without filling the Recycle Bin. Cannot be undone.</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="selected-items-preview">
+            <div class="preview-heading">Selected Targets:</div>
+            <ul id="modalItemsList" class="preview-list"></ul>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="cancelModalBtn" class="btn btn-ghost">Cancel</button>
+          <button id="confirmCleanBtn" class="btn btn-danger">Execute Cleanup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULT REPORT MODAL -->
+    <div id="reportModal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2 class="modal-title">Cleanup Report</h2>
+          <button id="closeReportBtn" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="cleanup-stat-box success">
+            <div class="stat-value text-green" id="reportFreedSpace">0 B</div>
+            <div class="stat-desc" id="reportHeadline">Reclaimed successfully!</div>
+          </div>
+          <div id="reportDetails" class="report-details-list"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="dismissReportBtn" class="btn btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

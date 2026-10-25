@@ -1,0 +1,21 @@
+{
+  "name": "space-hunter",
+  "version": "1.0.0",
+  "description": "Blazing fast local disk bloat detector, visual space explorer, and safe cleaner for Windows",
+  "main": "desktop.js",
+  "scripts": {
+    "start": "node desktop.js",
+    "cli": "node cli.js",
+    "server": "node src/server.js"
+  },
+  "keywords": [
+    "disk-cleaner",
+    "storage",
+    "bloat-hunter",
+    "node_modules-cleaner",
+    "cache-cleaner",
+    "windows-cleaner"
+  ],
+  "author": "",
+  "license": "MIT"
+}
